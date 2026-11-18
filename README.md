@@ -46,40 +46,53 @@ Other ideas:
 
 ### 1. Create a virtual environment
 
+> [!WARNING]
+> **Keep the virtual environment on a path with no spaces.** Flower's local SuperLink breaks if its packages are installed under a path containing spaces (e.g. `.../Trinity Documents/Year 4/...`). It fails with `Failed to start local SuperLink` or `Internal server error`. To avoid this, put the venv in your home folder, not inside the repo. A venv also can't be moved after it's created, so if you move it, delete it and create it again.
+
 macOS / Linux:
 
 ```sh
-python3.12 -m venv .venv
-source .venv/bin/activate
-pip install -U pip flwr
-pip install -r requirements-dev.txt
+python3.12 -m venv ~/.venvs/ia-a2
 
 # Stop Flower reinstalling all packages (incl. PyTorch) before every run
-echo 'export FLWR_DISABLE_RUNTIME_DEPENDENCY_INSTALLATION=1' >> .venv/bin/activate
-deactivate && source .venv/bin/activate
+echo 'export FLWR_DISABLE_RUNTIME_DEPENDENCY_INSTALLATION=1' >> ~/.venvs/ia-a2/bin/activate
+
+source ~/.venvs/ia-a2/bin/activate
+which python                     # should print ~/.venvs/ia-a2/bin/python
+python -m pip install -U pip
 ```
 
 Windows (PowerShell). Flower simulation on Windows is experimental, and WSL2 is recommended:
 
 ```powershell
-py -3.12 -m venv .venv
-.venv\Scripts\Activate.ps1
-pip install -U pip flwr
-pip install -r requirements-dev.txt
+py -3.12 -m venv $HOME\.venvs\ia-a2
+& $HOME\.venvs\ia-a2\Scripts\Activate.ps1
+python -m pip install -U pip
 $env:FLWR_DISABLE_RUNTIME_DEPENDENCY_INSTALLATION = "1"   # set this in every new terminal
 ```
 
-Conda works too (`conda create -n flower python=3.12`), as in the Lab 10 handout. `.venv/` is gitignored.
+Conda works too (`conda create -n flower python=3.12`), as in the Lab 10 handout. Conda envs live in your home folder, so the spaces problem doesn't apply.
 
-In VS Code, run **Python: Select Interpreter** and choose `.venv`.
+In VS Code, run **Python: Select Interpreter**, choose **Enter interpreter path...**, and enter `~/.venvs/ia-a2/bin/python` (Windows: `%USERPROFILE%\.venvs\ia-a2\Scripts\python.exe`).
 
-### 2. Install the app
+### 2. Install the app and dev tools
 
-From the repo root (where `pyproject.toml` lives):
+From the repo root (where `pyproject.toml` lives), with the venv active:
 
 ```sh
-pip install -e .
+python -m pip install -e . -r requirements-dev.txt
 ```
+
+This installs Flower, PyTorch, torchvision and Flower Datasets from `pyproject.toml`, plus ruff and pytest. PyTorch is a large download.
+
+The app code is in `pytorchexample/`, copied from the Lab 10 quickstart:
+
+| File | What it does |
+|---|---|
+| `task.py` | CNN model, CIFAR-10 loading and partitioning, train/test loops |
+| `client_app.py` | What each client does: local training and evaluation |
+| `server_app.py` | FedAvg strategy and evaluation on the full CIFAR-10 test set |
+| `pyproject.toml` | Dependencies and default run settings (`[tool.flwr.app.config]`) |
 
 ### 3. Run an experiment
 
@@ -93,7 +106,16 @@ flwr run . local --stream \
   --federation-config "num-supernodes=N"
 ```
 
-`--run-config` overrides values under `[tool.flwr.app.config]` in `pyproject.toml` for that run only. The first run downloads CIFAR-10, so it takes longer.
+`--run-config` overrides values under `[tool.flwr.app.config]` in `pyproject.toml` for that run only. The first run downloads CIFAR-10, so it takes longer. The `HF_TOKEN` warning is harmless.
+
+### Troubleshooting
+
+| Symptom | Fix |
+|---|---|
+| `zsh: command not found: pip`, or `externally-managed-environment` | The venv isn't active or was moved. Recreate it (step 1) and use `python -m pip`. |
+| `Failed to start local SuperLink` or `Internal server error` | Most likely the venv is on a path with spaces (see step 1). Stop the old SuperLink with `pkill -f "flower-superlink.*--port 39091"`, then check `~/.flwr/local-superlink/superlink.log`. |
+| `Can't locate revision ...` when starting the SuperLink | `~/.flwr/local-superlink/state.db` was written by a different Flower version, or the spaces problem again. Move it aside (`mv state.db state.db.bak`) and rerun. |
+| Stuck on `Installing application dependencies...` | `FLWR_DISABLE_RUNTIME_DEPENDENCY_INSTALLATION=1` isn't set. Re-activate the venv and restart the SuperLink. |
 
 ### Lint and tests
 
