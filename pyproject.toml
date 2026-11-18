@@ -33,3 +33,11 @@ local-epochs = 1
 learning-rate = 0.1
 batch-size = 32
 save-model = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+filterwarnings = [
+    # Noise from Flower's CLI dependencies, not our code
+    "ignore::DeprecationWarning:typer",
+]

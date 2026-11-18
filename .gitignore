@@ -10,3 +10,10 @@ venv/
 .ruff_cache/
 .cache/
 .DS_Store
+
+# Flower App Bundles from `flwr build`
+*.fab
+
+# CI reports
+report.xml
+gl-code-quality-report.json

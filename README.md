@@ -125,4 +125,19 @@ ruff format .         # auto-format
 pytest -q             # tests
 ```
 
-The GitLab pipeline runs the same lint, format and syntax checks on every push, plus tests when a `tests/` folder exists. It never runs training.
+Tests use small random data, so they need no downloads and finish in a few seconds. `tests/test_config.py` checks that every `run_config[...]` key the code reads is defined in `pyproject.toml` with a sensible value. Run it after adding a new setting.
+
+### CI pipeline
+
+Every push runs `lint → build → test` on GitLab. It **never runs training**.
+
+| Stage | Job | What it checks |
+|---|---|---|
+| lint | `lint:ruff` | Lint errors, also shown in the MR's Code Quality widget |
+| lint | `lint:format` | Formatting (warning only, so it doesn't block). Fix with `ruff format .` |
+| build | `build:compile` | Every file compiles |
+| build | `build:flower-app` | `flwr build` packages the app like `flwr run` does. The `.fab` is kept for a week |
+| test | `test:config` | `pyproject.toml` settings match what the code reads (standard library only, seconds) |
+| test | `test:unit` | Model shape, train/test loops, app wiring (installs CPU PyTorch, ~1–2 min uncached) |
+
+Test results appear in the pipeline's **Tests** tab and on merge requests. When an MR is open, only the MR pipeline runs, not a duplicate branch pipeline.
