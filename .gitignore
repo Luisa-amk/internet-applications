@@ -1,2 +1,12 @@
 # Assignment brief (local only)
-Project Description.pdf
+Documents/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.cache/
+.DS_Store

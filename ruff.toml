@@ -1,0 +1,7 @@
+line-length = 100
+target-version = "py312"
+extend-exclude = [".cache"]
+
+[lint]
+# Ruff defaults (syntax errors, undefined names, unused imports, etc.) plus import sorting
+extend-select = ["I"]
