@@ -1,0 +1,49 @@
+# Lightweight CI: lint, syntax check, and tests (when tests exist).
+# Experiments are NOT run here. Training happens on our own machines.
+
+default:
+  image: python:3.12-slim
+  tags:
+    - docker # route to the SCSS Docker Runner; the default shared runner ignores `image:`
+  interruptible: true
+  cache:
+    key: pip
+    paths:
+      - .cache/pip
+
+variables:
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
+
+stages:
+  - check
+  - test
+
+lint:
+  stage: check
+  script:
+    - pip install -r requirements-dev.txt
+    - ruff check .
+
+format:
+  stage: check
+  allow_failure: true # warns instead of blocking; run `ruff format .` locally to fix
+  script:
+    - pip install -r requirements-dev.txt
+    - ruff format --check .
+
+compile:
+  stage: check
+  script:
+    - python -m compileall -q -x '(\.venv|\.cache)' .
+
+test:
+  stage: test
+  rules:
+    - exists:
+        - "tests/**/*.py"
+        - "**/test_*.py"
+  script:
+    # CPU-only torch keeps the install small; no GPU on CI runners
+    - pip install --extra-index-url https://download.pytorch.org/whl/cpu -e . -r requirements-dev.txt
+    - pytest -q

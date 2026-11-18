@@ -1,0 +1,3 @@
+# Dev tools (lint + tests). Runtime deps live in the Flower app's pyproject.toml.
+ruff
+pytest
