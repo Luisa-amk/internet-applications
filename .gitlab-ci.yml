@@ -86,7 +86,14 @@ build:flower-app:
     paths: [.cache/pip]
   script:
     - pip install flwr
+    # Flower validates the app directory name. The GitLab checkout name does not
+    # meet its letter/digit/hyphen rules, so build from a valid staging directory.
+    - mkdir -p /tmp/quickstart-pytorch
+    - cp pyproject.toml LICENSE /tmp/quickstart-pytorch/
+    - cp -r pytorchexample /tmp/quickstart-pytorch/
+    - cd /tmp/quickstart-pytorch
     - flwr build --app .
+    - cp *.fab "$CI_PROJECT_DIR/"
   artifacts:
     name: "flower-app-$CI_COMMIT_SHORT_SHA"
     paths: ["*.fab"]
