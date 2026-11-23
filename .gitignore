@@ -17,3 +17,7 @@ venv/
 # CI reports
 report.xml
 gl-code-quality-report.json
+
+# Saved models (results JSON files are committed, models are not)
+results/*.pt
+*.json.tmp
