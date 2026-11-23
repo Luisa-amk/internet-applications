@@ -6,7 +6,7 @@ import torch
 from datasets import Dataset
 from flwr_datasets.partitioner import DirichletPartitioner, IidPartitioner
 
-from pytorchexample.task import Net, make_partitioner, set_seed
+from fedlearn.task import Net, make_partitioner, set_seed
 
 
 def fake_labels(n=2000, classes=10):

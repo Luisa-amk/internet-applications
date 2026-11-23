@@ -1,3 +1,4 @@
-# Dev tools (lint + tests). Runtime deps live in the Flower app's pyproject.toml.
+# Dev tools (lint, tests, plotting). Runtime deps live in the Flower app's pyproject.toml.
 ruff
 pytest
+matplotlib  # scripts/plot_results.py (also pulled in by flwr-datasets, but used directly)

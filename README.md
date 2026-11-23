@@ -2,11 +2,13 @@
 
 Federated learning experiments built on Lab 10: FedAvg with the Flower framework and the Lab 10 CNN on CIFAR-10, run as a simulation on a single machine.
 
+Team members: read [CONTRIBUTING.md](CONTRIBUTING.md) before starting a task. It lists the fixed baseline settings, the assumptions behind the results, and our conventions.
+
 ## Tasks
 
 | Task | What | Notes |
 |---|---|---|
-| 1. Baseline | FedAvg, 10 clients, IID data | Tune rounds / local epochs / learning rate until test accuracy ≥ 50%. Record settings and plot accuracy over rounds. These settings are the baseline for everything else. |
+| 1. Baseline | FedAvg, 10 clients, IID data | **Done: 58.46% test accuracy.** Learning rate 0.01, 1 local epoch, 20 rounds, batch size 32. Passes 50% at round 10. These are the defaults in `pyproject.toml`, and every other experiment changes only what it studies. See [below](#task-1-baseline). |
 | 2. Number of clients | 2, 5, 10 clients (IID) | Change only the client count. Compare accuracy over rounds and training time, and state the hardware used. |
 | 3. Data distribution | IID vs non-IID, 10 clients | `DirichletPartitioner(partition_by="label", alpha=0.5)` in `task.py`. Also try α = 0.1 and 1.0. |
 | 4. Extra tasks | 3 required for a team of 4 or 5 | ⌈(X+1)/2⌉ where X = team size. Each one must be justified in the report. |
@@ -26,12 +28,26 @@ Other ideas:
 - **Differential privacy**: privacy vs accuracy trade-off
 - **Unreliable clients**: dropouts / stragglers
 
+### Task 1 baseline
+
+![Task 1 baseline: test accuracy per round](figures/task1-baseline.png)
+
+The learning rate and local epochs were chosen with a short sweep (20 rounds, 10 IID clients, seed 42):
+
+| Learning rate | Local epochs | Final accuracy | Seconds / round | Total time |
+|---|---|---|---|---|
+| **0.01** | **1** | **58.46%** | 4.2 | 103 s |
+| 0.01 | 2 | 61.78% | 8.5 | 188 s |
+| 0.05 | 1 | 53.68% | 5.0 | 119 s |
+| 0.1 | 1 | 31.30% | 4.7 | 113 s |
+
+lr 0.01 with 1 local epoch is the cheapest setting that clears 50% with a clear margin. Two local epochs gain about 3 points at twice the cost. lr 0.1 (the Lab 10 default) is too high with momentum 0.9. Plot: [`figures/task1-sweep.png`](figures/task1-sweep.png). Data: [`results/`](results/). Hardware: Apple M4, 10 cores, 16 GB RAM, CPU only.
+
 ## Deadlines
 
 | Date | Milestone |
 |---|---|
 | Fri 20 Nov, 23:59 | Email group registration ("CSU44000 A2 Group Registration") |
-| ~Sat 21 Nov | Task 1 baseline locked; shared results format agreed |
 | Thu 26 Nov | Draft A0 poster posted to the Discussion Board |
 | Mon 30 Nov, 23:59 | Feedback given on the two neighbouring posters |
 | **Tue 1 Dec, 23:59** | Final submission on Blackboard (declaration, report, poster) |
@@ -85,13 +101,14 @@ python -m pip install -e . -r requirements-dev.txt
 
 This installs Flower, PyTorch, torchvision and Flower Datasets from `pyproject.toml`, plus ruff and pytest. PyTorch is a large download.
 
-The app code is in `pytorchexample/`, copied from the Lab 10 quickstart:
+The app code is in `fedlearn/`, built on the Lab 10 quickstart:
 
 | File | What it does |
 |---|---|
 | `task.py` | CNN model, CIFAR-10 loading and partitioning, train/test loops |
 | `client_app.py` | What each client does: local training and evaluation |
 | `server_app.py` | FedAvg strategy, evaluation on the full CIFAR-10 test set, writes the results file |
+| `strategy.py` | `OrderedFedAvg`: FedAvg that averages client updates in a fixed order, so the same seed gives identical results. Wrap other strategies the same way (`class OrderedFedProx(OrderedReplies, FedProx)`) |
 | `results.py` | Results JSON format, round timing, hardware info |
 | `pyproject.toml` | Dependencies and default run settings (`[tool.flwr.app.config]`) |
 | `scripts/run.py` | Runs one experiment and saves its results to `results/` |
@@ -116,9 +133,9 @@ python scripts/run.py --dry-run -n 5 seed=7
 
 | Setting | Default | Notes |
 |---|---|---|
-| `num-server-rounds` | 3 | FL rounds |
+| `num-server-rounds` | 20 | FL rounds |
 | `local-epochs` | 1 | Epochs each client trains per round |
-| `learning-rate` | 0.1 | SGD with momentum 0.9 |
+| `learning-rate` | 0.01 | SGD with momentum 0.9 |
 | `batch-size` | 32 | |
 | `fraction-evaluate` | 1.0 | Share of clients that run federated evaluation each round |
 | `partitioner` | `iid` | `iid` or `dirichlet` |

@@ -1,4 +1,4 @@
-"""pytorchexample: A Flower / PyTorch app."""
+"""fedlearn: federated learning experiments with Flower and PyTorch."""
 
 import random
 

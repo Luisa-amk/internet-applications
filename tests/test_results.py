@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from pytorchexample.results import RoundTimer, RunRecord, default_run_name, hardware_info
+from fedlearn.results import RoundTimer, RunRecord, default_run_name, hardware_info
 
 BASE = {"partitioner": "iid", "dirichlet-alpha": 0.5, "num-server-rounds": 20, "seed": 42}
 
@@ -50,7 +50,7 @@ def test_run_record_save_overwrites_same_file(tmp_path):
 
 def test_round_timer_excludes_central_eval(monkeypatch):
     clock = iter([0.0, 5.0, 15.0, 18.0])  # eval0 start/end, eval1 start/end
-    monkeypatch.setattr("pytorchexample.results.time.perf_counter", lambda: next(clock))
+    monkeypatch.setattr("fedlearn.results.time.perf_counter", lambda: next(clock))
     timer = RoundTimer()
 
     assert timer.eval_started() is None  # round 0: no training happened yet

@@ -3,9 +3,9 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "quickstart-pytorch"
-version = "1.1.13"
-description = "Federated Learning with PyTorch and Flower (Quickstart Example)"
+name = "fedlearn"
+version = "1.0.0"
+description = "CSU44000 Assignment 2: federated learning experiments with Flower (FedAvg, CNN on CIFAR-10)"
 license = {file = "LICENSE"}
 dependencies = [
     # Pinned so everyone runs identical code. Bump together, as a team.
@@ -20,19 +20,22 @@ dependencies = [
 packages = ["."]
 
 [tool.flwr.app]
-publisher = "flwrlabs"
+publisher = "csu44000"
 fab-format-version = 1
 flwr-version-target = "1.44.0"
 
 [tool.flwr.app.components]
-serverapp = "pytorchexample.server_app:app"
-clientapp = "pytorchexample.client_app:app"
+serverapp = "fedlearn.server_app:app"
+clientapp = "fedlearn.client_app:app"
 
 [tool.flwr.app.config]
-num-server-rounds = 3
+# Task 1 baseline (10 clients, IID): 58.46% test accuracy after 20 rounds (50% at round 10).
+# Every other experiment changes only the setting it studies.
+# Run: results/task1-baseline_*.json. Sweep: results/task1-sweep/.
+num-server-rounds = 20
 fraction-evaluate = 1.0
 local-epochs = 1
-learning-rate = 0.1
+learning-rate = 0.01
 batch-size = 32
 save-model = false
 # Reproducibility: seeds model init, data partitioning/shuffling and client training

@@ -1,4 +1,4 @@
-"""pytorchexample: A Flower / PyTorch app."""
+"""fedlearn: federated learning experiments with Flower and PyTorch."""
 
 import time
 
@@ -6,9 +6,10 @@ import torch
 from flwr.app import ArrayRecord, Context, Message, MetricRecord, RecordDict
 from flwr.clientapp import ClientApp
 
-from pytorchexample.task import Net, load_data, set_seed
-from pytorchexample.task import test as test_fn
-from pytorchexample.task import train as train_fn
+from fedlearn.strategy import META_KEY, client_meta
+from fedlearn.task import Net, load_data, set_seed
+from fedlearn.task import test as test_fn
+from fedlearn.task import train as train_fn
 
 # Flower ClientApp
 app = ClientApp()
@@ -66,7 +67,13 @@ def train(msg: Message, context: Context):
         "num-examples": len(trainloader.dataset),
     }
     metric_record = MetricRecord(metrics)
-    content = RecordDict({"arrays": model_record, "metrics": metric_record})
+    content = RecordDict(
+        {
+            "arrays": model_record,
+            "metrics": metric_record,
+            META_KEY: client_meta(_partition_id(context)),
+        }
+    )
     return Message(content=content, reply_to=msg)
 
 
@@ -97,5 +104,5 @@ def evaluate(msg: Message, context: Context):
         "num-examples": len(valloader.dataset),
     }
     metric_record = MetricRecord(metrics)
-    content = RecordDict({"metrics": metric_record})
+    content = RecordDict({"metrics": metric_record, META_KEY: client_meta(_partition_id(context))})
     return Message(content=content, reply_to=msg)

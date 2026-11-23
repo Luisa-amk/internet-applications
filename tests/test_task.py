@@ -11,8 +11,8 @@ import torch
 from PIL import Image
 from torch.utils.data import DataLoader
 
-from pytorchexample.task import Net, apply_transforms, train
-from pytorchexample.task import test as evaluate
+from fedlearn.task import Net, apply_transforms, train
+from fedlearn.task import test as evaluate
 
 CPU = torch.device("cpu")
 

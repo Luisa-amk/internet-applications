@@ -1,4 +1,4 @@
-"""pytorchexample: A Flower / PyTorch app."""
+"""fedlearn: federated learning experiments with Flower and PyTorch."""
 
 import time
 from pathlib import Path
@@ -6,16 +6,16 @@ from pathlib import Path
 import torch
 from flwr.app import ArrayRecord, ConfigRecord, Context, MetricRecord
 from flwr.serverapp import Grid, ServerApp
-from flwr.serverapp.strategy import FedAvg
 
-from pytorchexample.results import (
+from fedlearn.results import (
     DEFAULT_RESULTS_DIR,
     RoundTimer,
     RunRecord,
     default_run_name,
     hardware_info,
 )
-from pytorchexample.task import Net, load_centralized_dataset, set_seed, test
+from fedlearn.strategy import OrderedFedAvg
+from fedlearn.task import Net, load_centralized_dataset, set_seed, test
 
 # Create ServerApp
 app = ServerApp()
@@ -66,8 +66,8 @@ def main(grid: Grid, context: Context) -> None:
         record.save(results_dir)  # save every round so partial runs aren't lost
         return metrics
 
-    # Initialize FedAvg strategy
-    strategy = FedAvg(fraction_evaluate=fraction_evaluate)
+    # FedAvg, aggregating client updates in a fixed order (see strategy.py)
+    strategy = OrderedFedAvg(fraction_evaluate=fraction_evaluate)
 
     # Start strategy, run FedAvg for `num_rounds`
     t_start = time.perf_counter()
