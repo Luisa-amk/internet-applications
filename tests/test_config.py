@@ -11,7 +11,7 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
-APP_DIR = ROOT / "pytorchexample"
+APP_DIR = ROOT / "fedlearn"
 PYPROJECT = tomllib.loads((ROOT / "pyproject.toml").read_text())
 FLWR = PYPROJECT["tool"]["flwr"]["app"]
 RUN_CONFIG = FLWR["config"]

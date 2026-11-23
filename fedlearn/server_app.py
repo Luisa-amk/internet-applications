@@ -1,4 +1,4 @@
-"""pytorchexample: A Flower / PyTorch app."""
+"""fedlearn: federated learning experiments with Flower and PyTorch."""
 
 import time
 from pathlib import Path
@@ -7,15 +7,15 @@ import torch
 from flwr.app import ArrayRecord, ConfigRecord, Context, MetricRecord
 from flwr.serverapp import Grid, ServerApp
 
-from pytorchexample.results import (
+from fedlearn.results import (
     DEFAULT_RESULTS_DIR,
     RoundTimer,
     RunRecord,
     default_run_name,
     hardware_info,
 )
-from pytorchexample.strategy import OrderedFedAvg
-from pytorchexample.task import Net, load_centralized_dataset, set_seed, test
+from fedlearn.strategy import OrderedFedAvg
+from fedlearn.task import Net, load_centralized_dataset, set_seed, test
 
 # Create ServerApp
 app = ServerApp()

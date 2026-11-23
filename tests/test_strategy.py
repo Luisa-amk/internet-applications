@@ -8,7 +8,7 @@ import torch
 from flwr.app import ArrayRecord, MetricRecord, RecordDict
 from flwr.serverapp.strategy import FedAvg
 
-from pytorchexample.strategy import META_KEY, OrderedFedAvg, client_meta, sort_replies
+from fedlearn.strategy import META_KEY, OrderedFedAvg, client_meta, sort_replies
 
 
 class FakeReply:

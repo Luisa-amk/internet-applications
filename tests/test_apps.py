@@ -5,12 +5,12 @@ from flwr.serverapp import ServerApp
 
 
 def test_server_app_imports():
-    from pytorchexample.server_app import app
+    from fedlearn.server_app import app
 
     assert isinstance(app, ServerApp)
 
 
 def test_client_app_imports():
-    from pytorchexample.client_app import app
+    from fedlearn.client_app import app
 
     assert isinstance(app, ClientApp)

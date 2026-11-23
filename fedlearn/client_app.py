@@ -1,4 +1,4 @@
-"""pytorchexample: A Flower / PyTorch app."""
+"""fedlearn: federated learning experiments with Flower and PyTorch."""
 
 import time
 
@@ -6,10 +6,10 @@ import torch
 from flwr.app import ArrayRecord, Context, Message, MetricRecord, RecordDict
 from flwr.clientapp import ClientApp
 
-from pytorchexample.strategy import META_KEY, client_meta
-from pytorchexample.task import Net, load_data, set_seed
-from pytorchexample.task import test as test_fn
-from pytorchexample.task import train as train_fn
+from fedlearn.strategy import META_KEY, client_meta
+from fedlearn.task import Net, load_data, set_seed
+from fedlearn.task import test as test_fn
+from fedlearn.task import train as train_fn
 
 # Flower ClientApp
 app = ClientApp()

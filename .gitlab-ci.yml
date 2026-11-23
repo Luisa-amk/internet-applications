@@ -88,10 +88,10 @@ build:flower-app:
     - pip install flwr
     # Flower validates the app directory name. The GitLab checkout name does not
     # meet its letter/digit/hyphen rules, so build from a valid staging directory.
-    - mkdir -p /tmp/quickstart-pytorch
-    - cp pyproject.toml LICENSE /tmp/quickstart-pytorch/
-    - cp -r pytorchexample /tmp/quickstart-pytorch/
-    - cd /tmp/quickstart-pytorch
+    - mkdir -p /tmp/fedlearn
+    - cp pyproject.toml LICENSE /tmp/fedlearn/
+    - cp -r fedlearn /tmp/fedlearn/
+    - cd /tmp/fedlearn
     - flwr build --app .
     - cp *.fab "$CI_PROJECT_DIR/"
   artifacts:
