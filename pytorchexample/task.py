@@ -1,10 +1,13 @@
 """pytorchexample: A Flower / PyTorch app."""
 
+import random
+
+import numpy as np
 import torch
 import torch.nn.functional as F
 from datasets import load_dataset
 from flwr_datasets import FederatedDataset
-from flwr_datasets.partitioner import IidPartitioner
+from flwr_datasets.partitioner import DirichletPartitioner, IidPartitioner, Partitioner
 from torch import nn
 from torch.utils.data import DataLoader
 from torchvision.transforms import Compose, Normalize, ToTensor
@@ -31,9 +34,40 @@ class Net(nn.Module):
         return self.fc3(x)
 
 
-fds = None  # Cache FederatedDataset
+DATASET = "uoft-cs/cifar10"
+PARTITIONERS = ("iid", "dirichlet")
+
+# One FederatedDataset per partitioning setup, reused across rounds in the same process
+_fds_cache: dict[tuple, FederatedDataset] = {}
+_centralized_testloader: DataLoader | None = None
 
 pytorch_transforms = Compose([ToTensor(), Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
+
+
+def set_seed(seed: int) -> None:
+    """Seed every RNG that affects training: model init, DataLoader shuffling, dropout."""
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+
+
+def make_partitioner(name: str, num_partitions: int, alpha: float, seed: int) -> Partitioner:
+    """Build the partitioner that decides which training images each client gets.
+
+    - "iid": every client gets an equal, random share of all 10 classes (Lab 10 default).
+    - "dirichlet": each client's class mix is drawn from Dirichlet(alpha). Lower alpha
+      means more skewed clients (Task 3 uses alpha=0.5).
+    """
+    if name == "iid":
+        return IidPartitioner(num_partitions=num_partitions)
+    if name == "dirichlet":
+        return DirichletPartitioner(
+            num_partitions=num_partitions,
+            partition_by="label",
+            alpha=float(alpha),
+            seed=seed,
+        )
+    raise ValueError(f"unknown partitioner {name!r}; expected one of {PARTITIONERS}")
 
 
 def apply_transforms(batch):
@@ -42,19 +76,26 @@ def apply_transforms(batch):
     return batch
 
 
-def load_data(partition_id: int, num_partitions: int, batch_size: int):
-    """Load partition CIFAR10 data."""
-    # Only initialize `FederatedDataset` once
-    global fds
-    if fds is None:
-        partitioner = IidPartitioner(num_partitions=num_partitions)
-        fds = FederatedDataset(
-            dataset="uoft-cs/cifar10",
-            partitioners={"train": partitioner},
+def load_data(
+    partition_id: int,
+    num_partitions: int,
+    batch_size: int,
+    partitioner: str = "iid",
+    alpha: float = 0.5,
+    seed: int = 42,
+):
+    """Load this client's partition of CIFAR-10 as train/validation DataLoaders."""
+    key = (partitioner, num_partitions, float(alpha), seed)
+    if key not in _fds_cache:
+        _fds_cache[key] = FederatedDataset(
+            dataset=DATASET,
+            partitioners={"train": make_partitioner(partitioner, num_partitions, alpha, seed)},
+            shuffle=True,
+            seed=seed,
         )
-    partition = fds.load_partition(partition_id)
+    partition = _fds_cache[key].load_partition(partition_id)
     # Divide data on each node: 80% train, 20% test
-    partition_train_test = partition.train_test_split(test_size=0.2, seed=42)
+    partition_train_test = partition.train_test_split(test_size=0.2, seed=seed)
     # Construct dataloaders
     partition_train_test = partition_train_test.with_transform(apply_transforms)
     trainloader = DataLoader(partition_train_test["train"], batch_size=batch_size, shuffle=True)
@@ -63,11 +104,13 @@ def load_data(partition_id: int, num_partitions: int, batch_size: int):
 
 
 def load_centralized_dataset():
-    """Load test set and return dataloader."""
-    # Load entire test set
-    test_dataset = load_dataset("uoft-cs/cifar10", split="test")
-    dataset = test_dataset.with_format("torch").with_transform(apply_transforms)
-    return DataLoader(dataset, batch_size=128)
+    """Load the full CIFAR-10 test set once and reuse it for every round's evaluation."""
+    global _centralized_testloader
+    if _centralized_testloader is None:
+        test_dataset = load_dataset(DATASET, split="test")
+        dataset = test_dataset.with_format("torch").with_transform(apply_transforms)
+        _centralized_testloader = DataLoader(dataset, batch_size=128)
+    return _centralized_testloader
 
 
 def train(net, trainloader, epochs, lr, device):

@@ -51,6 +51,11 @@ def test_no_unused_config_keys():
         ("learning-rate", float, lambda v: 0 < v < 1),
         ("fraction-evaluate", float, lambda v: 0 <= v <= 1),
         ("save-model", bool, lambda v: True),
+        ("seed", int, lambda v: v >= 0),
+        ("partitioner", str, lambda v: v in ("iid", "dirichlet")),
+        ("dirichlet-alpha", float, lambda v: v > 0),
+        ("results-dir", str, lambda v: True),
+        ("run-name", str, lambda v: True),
     ],
 )
 def test_config_value_types_and_ranges(key, kind, check):

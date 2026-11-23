@@ -91,22 +91,63 @@ The app code is in `pytorchexample/`, copied from the Lab 10 quickstart:
 |---|---|
 | `task.py` | CNN model, CIFAR-10 loading and partitioning, train/test loops |
 | `client_app.py` | What each client does: local training and evaluation |
-| `server_app.py` | FedAvg strategy and evaluation on the full CIFAR-10 test set |
+| `server_app.py` | FedAvg strategy, evaluation on the full CIFAR-10 test set, writes the results file |
+| `results.py` | Results JSON format, round timing, hardware info |
 | `pyproject.toml` | Dependencies and default run settings (`[tool.flwr.app.config]`) |
+| `scripts/run.py` | Runs one experiment and saves its results to `results/` |
+| `scripts/plot_results.py` | Plots results files and prints a summary table |
 
 ### 3. Run an experiment
 
-```sh
-# Default settings (3 rounds, 2 clients)
-flwr run . local --stream
+Use `scripts/run.py`. It wraps `flwr run`, saves results to `results/`, and checks setting names before a long run starts:
 
-# Custom rounds / learning rate / number of clients
-flwr run . local --stream \
-  --run-config "num-server-rounds=R learning-rate=0.001 fraction-evaluate=0.5" \
-  --federation-config "num-supernodes=N"
+```sh
+# 10 clients, IID, custom rounds / learning rate
+python scripts/run.py -n 10 num-server-rounds=20 learning-rate=0.01
+
+# Non-IID (Task 3), with a custom results file name
+python scripts/run.py -n 10 --name task3-alpha0.5 partitioner=dirichlet dirichlet-alpha=0.5
+
+# Show the flwr command without running it
+python scripts/run.py --dry-run -n 5 seed=7
 ```
 
-`--run-config` overrides values under `[tool.flwr.app.config]` in `pyproject.toml` for that run only. The first run downloads CIFAR-10, so it takes longer. The `HF_TOKEN` warning is harmless.
+`-n` sets the number of clients (default 10). Any `key=value` overrides a setting under `[tool.flwr.app.config]` in `pyproject.toml` for that run only:
+
+| Setting | Default | Notes |
+|---|---|---|
+| `num-server-rounds` | 3 | FL rounds |
+| `local-epochs` | 1 | Epochs each client trains per round |
+| `learning-rate` | 0.1 | SGD with momentum 0.9 |
+| `batch-size` | 32 | |
+| `fraction-evaluate` | 1.0 | Share of clients that run federated evaluation each round |
+| `partitioner` | `iid` | `iid` or `dirichlet` |
+| `dirichlet-alpha` | 0.5 | Only for `dirichlet`. Lower = more skewed clients |
+| `seed` | 42 | Same seed + same settings = identical results |
+| `save-model` | false | Saves the final model as a `.pt` next to the results file |
+
+The first run downloads CIFAR-10, so it takes longer. The `HF_TOKEN` warning is harmless. Plain `flwr run . local --stream` still works, but its results go to `~/ia-a2-results/` instead, because Flower runs the server from wherever the local SuperLink was first started.
+
+### 4. Results and plots
+
+Each run writes one JSON file to `results/`, named after its settings (e.g. `iid-c10-r20-s42_20261123T114112.json`). The file is updated after every round, so a stopped run still keeps its progress. It contains:
+
+- `config`: every setting used, `num_clients`, and `hardware` (CPU, cores, RAM, OS, library versions)
+- `rounds`: one entry per round. Round 0 is the untrained model. Each entry has:
+  - `accuracy` and `loss` on the full CIFAR-10 test set
+  - `round_time_s`: client training plus federated evaluation, **excluding** the central test-set evaluation (`central_eval_time_s`)
+  - `client_train` / `client_eval`: client metrics averaged over clients, weighted by example count, including `train_time_s`
+- `total_time_s` and `finished`
+
+Round 1 also includes one-off start-up costs (starting the client processes, loading partitions), so it's slower than later rounds. When comparing training time (Task 2), use the mean of rounds 2 onwards or the total, and say which.
+
+```sh
+python scripts/plot_results.py                                       # all of results/, to figures/accuracy.png
+python scripts/plot_results.py results/iid-c*.json -o figures/task2.png --x time
+python scripts/plot_results.py results/dirichlet* --metric loss
+```
+
+It also prints a table of final and best accuracy, mean seconds per round, and total time for each run. Commit finished results files so everyone plots from the same data.
 
 ### Troubleshooting
 
@@ -115,6 +156,7 @@ flwr run . local --stream \
 | `zsh: command not found: pip`, or `externally-managed-environment` | The venv isn't active or was moved. Recreate it (step 1) and use `python -m pip`. |
 | `Failed to start local SuperLink` or `Internal server error` | Most likely the venv is on a path with spaces (see step 1). Stop the old SuperLink with `pkill -f "flower-superlink.*--port 39091"`, then check `~/.flwr/local-superlink/superlink.log`. |
 | `Can't locate revision ...` when starting the SuperLink | `~/.flwr/local-superlink/state.db` was written by a different Flower version, or the spaces problem again. Move it aside (`mv state.db state.db.bak`) and rerun. |
+| Run stuck at `starting` (`flwr ls`) and nothing happens | The background SuperLink has stalled, e.g. after the laptop slept. Restart it with `pkill -f "flower-superlink.*--port 39091"` and rerun. |
 | Stuck on `Installing application dependencies...` | `FLWR_DISABLE_RUNTIME_DEPENDENCY_INSTALLATION=1` isn't set. Re-activate the venv and restart the SuperLink. |
 
 ### Lint and tests

@@ -8,8 +8,10 @@ version = "1.1.13"
 description = "Federated Learning with PyTorch and Flower (Quickstart Example)"
 license = {file = "LICENSE"}
 dependencies = [
-    "flwr[simulation]>=1.36.0",
-    "flwr-datasets[vision]>=0.6.1",
+    # Pinned so everyone runs identical code. Bump together, as a team.
+    # (Flower rejects "==" for flwr itself; ">=X,<=X" is its exact-pin equivalent.)
+    "flwr[simulation]>=1.44.0,<=1.44.0",
+    "flwr-datasets[vision]==0.6.1",
     "torch==2.10.0",
     "torchvision==0.25.0",
 ]
@@ -20,7 +22,7 @@ packages = ["."]
 [tool.flwr.app]
 publisher = "flwrlabs"
 fab-format-version = 1
-flwr-version-target = "1.36.0"
+flwr-version-target = "1.44.0"
 
 [tool.flwr.app.components]
 serverapp = "pytorchexample.server_app:app"
@@ -33,6 +35,16 @@ local-epochs = 1
 learning-rate = 0.1
 batch-size = 32
 save-model = false
+# Reproducibility: seeds model init, data partitioning/shuffling and client training
+seed = 42
+# How CIFAR-10 is split across clients: "iid" (Task 1/2) or "dirichlet" (Task 3)
+partitioner = "iid"
+# Only used when partitioner = "dirichlet". Lower = more skewed clients
+dirichlet-alpha = 0.5
+# Results JSON location. Empty = ~/ia-a2-results. scripts/run.py sets it to ./results
+results-dir = ""
+# Name for this run's results file. Empty = generated from the settings
+run-name = ""
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
