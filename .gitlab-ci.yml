@@ -1,49 +1,126 @@
-# Lightweight CI: lint, syntax check, and tests (when tests exist).
+# CI: lint -> build -> test. Fast checks only.
 # Experiments are NOT run here. Training happens on our own machines.
+
+# One pipeline per push: MR pipelines when an MR is open, branch pipelines otherwise
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS
+      when: never
+    - if: $CI_COMMIT_BRANCH
 
 default:
   image: python:3.12-slim
   tags:
     - docker # route to the SCSS Docker Runner; the default shared runner ignores `image:`
   interruptible: true
-  cache:
-    key: pip
-    paths:
-      - .cache/pip
 
 variables:
   PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
   PIP_DISABLE_PIP_VERSION_CHECK: "1"
+  PIP_ROOT_USER_ACTION: "ignore"
+  # CPU-only PyTorch: much smaller download, and there's no GPU on the runners
+  PIP_EXTRA_INDEX_URL: "https://download.pytorch.org/whl/cpu"
 
 stages:
-  - check
+  - lint
+  - build
   - test
 
-lint:
-  stage: check
-  script:
-    - pip install -r requirements-dev.txt
-    - ruff check .
+# --- shared setup -------------------------------------------------------------
 
-format:
-  stage: check
+# Jobs that only need ruff / pytest
+.dev-tools:
+  cache:
+    key: dev-tools
+    paths: [.cache/pip]
+  before_script:
+    - pip install -r requirements-dev.txt
+
+# Jobs that need the full app (Flower + PyTorch). The cache is keyed on the
+# dependency files, so it's only rebuilt when dependencies change.
+.app:
+  cache:
+    key:
+      prefix: app
+      files: [pyproject.toml, requirements-dev.txt]
+    paths: [.cache/pip]
+  before_script:
+    - pip install -e . -r requirements-dev.txt
+
+# --- lint ---------------------------------------------------------------------
+
+lint:ruff:
+  stage: lint
+  extends: .dev-tools
+  script:
+    # Report for the MR "Code Quality" widget, then a readable run that sets the exit code
+    - ruff check --output-format=gitlab --output-file=gl-code-quality-report.json . || true
+    - ruff check --output-format=full .
+  artifacts:
+    when: always
+    reports:
+      codequality: gl-code-quality-report.json
+
+lint:format:
+  stage: lint
+  extends: .dev-tools
   allow_failure: true # warns instead of blocking; run `ruff format .` locally to fix
   script:
-    - pip install -r requirements-dev.txt
-    - ruff format --check .
+    - ruff format --check --diff .
 
-compile:
-  stage: check
+# --- build --------------------------------------------------------------------
+
+build:compile:
+  stage: build
+  needs: []
   script:
     - python -m compileall -q -x '(\.venv|\.cache)' .
 
-test:
-  stage: test
-  rules:
-    - exists:
-        - "tests/**/*.py"
-        - "**/test_*.py"
+# Package the app the same way `flwr run` does. Catches a broken pyproject.toml.
+build:flower-app:
+  stage: build
+  needs: []
+  cache:
+    key: flwr
+    paths: [.cache/pip]
   script:
-    # CPU-only torch keeps the install small; no GPU on CI runners
-    - pip install --extra-index-url https://download.pytorch.org/whl/cpu -e . -r requirements-dev.txt
-    - pytest -q
+    - pip install flwr
+    # Flower validates the app directory name. The GitLab checkout name does not
+    # meet its letter/digit/hyphen rules, so build from a valid staging directory.
+    - mkdir -p /tmp/quickstart-pytorch
+    - cp pyproject.toml LICENSE /tmp/quickstart-pytorch/
+    - cp -r pytorchexample /tmp/quickstart-pytorch/
+    - cd /tmp/quickstart-pytorch
+    - flwr build --app .
+    - cp *.fab "$CI_PROJECT_DIR/"
+  artifacts:
+    name: "flower-app-$CI_COMMIT_SHORT_SHA"
+    paths: ["*.fab"]
+    expire_in: 1 week
+
+# --- test ---------------------------------------------------------------------
+
+# Standard library only: checks pyproject.toml against the keys the code reads
+test:config:
+  stage: test
+  extends: .dev-tools
+  needs: []
+  script:
+    - pytest tests/test_config.py --junitxml=report.xml
+  artifacts:
+    when: always
+    reports:
+      junit: report.xml
+
+# Model, train/test loops and app wiring on random data. No downloads, no FL rounds.
+test:unit:
+  stage: test
+  extends: .app
+  needs: [lint:ruff, build:compile]
+  script:
+    - pytest --ignore=tests/test_config.py --junitxml=report.xml
+  artifacts:
+    when: always
+    reports:
+      junit: report.xml
