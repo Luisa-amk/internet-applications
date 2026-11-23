@@ -92,6 +92,7 @@ The app code is in `pytorchexample/`, copied from the Lab 10 quickstart:
 | `task.py` | CNN model, CIFAR-10 loading and partitioning, train/test loops |
 | `client_app.py` | What each client does: local training and evaluation |
 | `server_app.py` | FedAvg strategy, evaluation on the full CIFAR-10 test set, writes the results file |
+| `strategy.py` | `OrderedFedAvg`: FedAvg that averages client updates in a fixed order, so the same seed gives identical results. Wrap other strategies the same way (`class OrderedFedProx(OrderedReplies, FedProx)`) |
 | `results.py` | Results JSON format, round timing, hardware info |
 | `pyproject.toml` | Dependencies and default run settings (`[tool.flwr.app.config]`) |
 | `scripts/run.py` | Runs one experiment and saves its results to `results/` |
@@ -116,9 +117,9 @@ python scripts/run.py --dry-run -n 5 seed=7
 
 | Setting | Default | Notes |
 |---|---|---|
-| `num-server-rounds` | 3 | FL rounds |
+| `num-server-rounds` | 20 | FL rounds |
 | `local-epochs` | 1 | Epochs each client trains per round |
-| `learning-rate` | 0.1 | SGD with momentum 0.9 |
+| `learning-rate` | 0.01 | SGD with momentum 0.9 |
 | `batch-size` | 32 | |
 | `fraction-evaluate` | 1.0 | Share of clients that run federated evaluation each round |
 | `partitioner` | `iid` | `iid` or `dirichlet` |

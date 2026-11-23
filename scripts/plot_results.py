@@ -77,6 +77,8 @@ def plot(runs: list[dict], metric: str, x: str, out: Path) -> None:
         ax.plot(xs, [r[metric] for r in rounds], marker=".", label=run["name"])
 
     ax.set_xlabel("Training time (s)" if x == "time" else "Round")
+    if x == "round":
+        ax.xaxis.set_major_locator(matplotlib.ticker.MaxNLocator(integer=True))
     ax.set_ylabel("Test accuracy" if metric == "accuracy" else "Test loss")
     if metric == "accuracy":
         ax.yaxis.set_major_formatter(matplotlib.ticker.PercentFormatter(1.0))

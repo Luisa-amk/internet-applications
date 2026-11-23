@@ -29,10 +29,13 @@ serverapp = "pytorchexample.server_app:app"
 clientapp = "pytorchexample.client_app:app"
 
 [tool.flwr.app.config]
-num-server-rounds = 3
+# Task 1 baseline (10 clients, IID): 58.46% test accuracy after 20 rounds (50% at round 10).
+# Every other experiment changes only the setting it studies.
+# Run: results/task1-baseline_*.json. Sweep: results/task1-sweep/.
+num-server-rounds = 20
 fraction-evaluate = 1.0
 local-epochs = 1
-learning-rate = 0.1
+learning-rate = 0.01
 batch-size = 32
 save-model = false
 # Reproducibility: seeds model init, data partitioning/shuffling and client training
