@@ -22,13 +22,13 @@ Every experiment is compared against the Task 1 baseline, so these stay as they 
 | Test set | Full CIFAR-10 test set (10,000 images), evaluated on the server | `server_app.py` |
 | Results format | JSON fields in README "Results and plots". Add new fields, never rename or remove existing ones (the dashboard reads them) | `fedlearn/results.py` |
 
-**Baseline result:** 58.46% after 20 rounds, at `results/task1-baseline_*.json`. Compare against this file rather than re-running the baseline. If you do re-run it with the defaults, it should give exactly the same numbers. If it doesn't, something changed the baseline.
+**Baseline result:** 58.46% after 20 rounds, at `results/task1-baseline_*.json`. Compare against this file rather than re-running the baseline. A re-run with the defaults gives exactly the same numbers on the same machine (an Apple M4). On a different machine, expect drift of about 0.2% (e.g. 58.24% on an M1), because different chips round floating-point maths slightly differently. Larger differences mean something changed the baseline.
 
 ## 2. Assumptions behind the numbers
 
 Things to know when you read or report results:
 
-- **Runs are exactly repeatable.** The same seed and settings give identical accuracy, every round. This holds because:
+- **Runs are exactly repeatable on the same machine.** The same seed and settings give identical accuracy, every round. Across machines, expect about 0.2% drift. This holds because:
   - the seed covers model initialisation, partitioning, each client's train/validation split and shuffling, and each client's training (seeded per client and per round);
   - the server sorts client updates by partition ID before averaging. Flower hands them over in arrival order, and floating-point sums change slightly with the order, which caused about 0.1% drift before this was fixed.
 - **Each client splits its partition 80/20** into local train and validation sets. Client-side `eval_acc` uses that validation split. The headline `accuracy` is the server's evaluation on the full test set. Report `accuracy`.
@@ -76,6 +76,8 @@ Keep CIFAR-10 as the default and switch with a setting, e.g. `dataset = "cifar10
   ```
 - Commit the results JSON for every run that appears in the report or poster. Delete broken or test runs instead of committing them.
 - Plot with `scripts/plot_results.py`, saving to `figures/<task>-<what>.png`, and commit the figure too.
+- Poster and report figures (300 dpi PNG) live in `figures/poster/` and `figures/report/`. Add your commands to `scripts/build_figures.sh` so the whole set rebuilds with `sh scripts/build_figures.sh`. Use `--ref` for the baseline run (always grey and dashed), `--label` for readable names, and `--seeds` if you ran several seeds. See the examples in that script.
+- To compare against the baseline over several seeds, use `results/seeds/seeds-c10-iid-s{42,43,44}` (57.0% ± 1.3) rather than the single Task 1 run.
 - **Can't run it yourself?** Rachel can run experiments. Post the exact `scripts/run.py` command on your issue.
 
 ### Code
@@ -104,9 +106,11 @@ Copy this into your master issue:
 |---|---|---|
 | Set-up: CI, results logging, seeds, pinned dependencies, partitioner setting | Rachel | Done |
 | Task 1 baseline | Rachel | Done (58.46%) |
-| Task 2: 2 / 5 / 10 clients | | Open |
-| Task 3: IID vs non-IID (alpha 0.5, also 0.1 and 1.0) | | Open |
+| Task 2: 2 / 5 / 10 clients | Rwan | Done: 2 → 61.9%, 5 → 62.3%, 10 → 58.2% (all on one M1) |
+| Task 3: IID vs non-IID (alpha 0.5, also 0.1 and 1.0) | Esosa | Done: α 1.0 → 57.4%, 0.5 → 55.9%, 0.1 → 47.9% |
 | Centralised reference run: same CNN trained on one machine, as a ceiling for the report | | Open, optional |
+| Tasks 2–3 repeated with seeds 42–44 on one machine | Rachel | Done (`results/seeds/`) |
+| Poster and report figures, label-skew chart | Rachel | Done (`figures/poster/`, `figures/report/`) |
 | Extra tasks | see issues | Open |
 
 **After pulling the package rename** (from `pytorchexample` to `fedlearn`), reinstall once:

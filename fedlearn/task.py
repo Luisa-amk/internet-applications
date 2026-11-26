@@ -76,6 +76,21 @@ def apply_transforms(batch):
     return batch
 
 
+def federated_dataset(
+    partitioner: str, num_partitions: int, alpha: float, seed: int
+) -> FederatedDataset:
+    """CIFAR-10 split across clients; built once per setup and reused in the same process."""
+    key = (partitioner, num_partitions, float(alpha), seed)
+    if key not in _fds_cache:
+        _fds_cache[key] = FederatedDataset(
+            dataset=DATASET,
+            partitioners={"train": make_partitioner(partitioner, num_partitions, alpha, seed)},
+            shuffle=True,
+            seed=seed,
+        )
+    return _fds_cache[key]
+
+
 def load_data(
     partition_id: int,
     num_partitions: int,
@@ -85,15 +100,8 @@ def load_data(
     seed: int = 42,
 ):
     """Load this client's partition of CIFAR-10 as train/validation DataLoaders."""
-    key = (partitioner, num_partitions, float(alpha), seed)
-    if key not in _fds_cache:
-        _fds_cache[key] = FederatedDataset(
-            dataset=DATASET,
-            partitioners={"train": make_partitioner(partitioner, num_partitions, alpha, seed)},
-            shuffle=True,
-            seed=seed,
-        )
-    partition = _fds_cache[key].load_partition(partition_id)
+    fds = federated_dataset(partitioner, num_partitions, alpha, seed)
+    partition = fds.load_partition(partition_id)
     # Divide data on each node: 80% train, 20% test
     partition_train_test = partition.train_test_split(test_size=0.2, seed=seed)
     # Construct dataloaders
