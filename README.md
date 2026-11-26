@@ -9,8 +9,8 @@ Team members: read [CONTRIBUTING.md](CONTRIBUTING.md) before starting a task. It
 | Task | What | Notes |
 |---|---|---|
 | 1. Baseline | FedAvg, 10 clients, IID data | **Done: 58.46% test accuracy.** Learning rate 0.01, 1 local epoch, 20 rounds, batch size 32. Passes 50% at round 10. These are the defaults in `pyproject.toml`, and every other experiment changes only what it studies. See [below](#task-1-baseline). |
-| 2. Number of clients | 2, 5, 10 clients (IID) | Change only the client count. Compare accuracy over rounds and training time, and state the hardware used. |
-| 3. Data distribution | IID vs non-IID, 10 clients | `DirichletPartitioner(partition_by="label", alpha=0.5)` in `task.py`. Also try α = 0.1 and 1.0. |
+| 2. Number of clients | 2, 5, 10 clients (IID) | **Done.** Fewer clients reach higher accuracy in 20 rounds (2 → 61.9%, 5 → 62.3%, 10 → 58.2%), but each round takes longer. See [below](#task-2-number-of-clients). |
+| 3. Data distribution | IID vs non-IID, 10 clients | **Done.** Accuracy drops as client data gets more skewed: IID 58.5%, α = 1.0 57.4%, α = 0.5 55.9%, α = 0.1 47.9%. See [below](#task-3-iid-vs-non-iid). |
 | 4. Extra tasks | 3 required for a team of 4 or 5 | ⌈(X+1)/2⌉ where X = team size. Each one must be justified in the report. |
 
 Extra task ideas (pick 3):
@@ -42,6 +42,39 @@ The learning rate and local epochs were chosen with a short sweep (20 rounds, 10
 | 0.1 | 1 | 31.30% | 4.7 | 113 s |
 
 lr 0.01 with 1 local epoch is the cheapest setting that clears 50% with a clear margin. Two local epochs gain about 3 points at twice the cost. lr 0.1 (the Lab 10 default) is too high with momentum 0.9. Plot: [`figures/task1-sweep.png`](figures/task1-sweep.png). Data: [`results/`](results/). Hardware: Apple M4, 10 cores, 16 GB RAM, CPU only.
+
+### Task 2: number of clients
+
+Same baseline settings; only the number of clients changes. Each setting was run with seeds 42, 43 and 44 on one machine (Apple M4, 10 cores, 16 GB RAM), so the times compare. Values are mean ± standard deviation across seeds.
+
+| Clients | Final accuracy | Seconds / round (rounds 2+) | Total time |
+|---|---|---|---|
+| 2 | 60.8% ± 1.1 | 6.7 | 159 s |
+| 5 | 61.4% ± 0.5 | 5.8 | 145 s |
+| 10 | 57.0% ± 1.3 | 5.2 | 131 s |
+
+With fewer clients, each one holds more of the data, so it takes more training steps per round (625 steps with 2 clients, 125 with 10). Accuracy rises faster per round, but each round is slower, because 10 small jobs share the CPU cores better than 2 large ones. 2 and 5 clients are within each other's spread.
+
+![Task 2: accuracy against training time](figures/report/task2-time.png)
+
+Rwan's original single-seed runs (Apple M1) are in `results/task2/`.
+
+### Task 3: IID vs non-IID
+
+10 clients, baseline settings; only the partitioner changes (`DirichletPartitioner(partition_by="label", alpha=…)`). Lower α gives each client a more lopsided mix of classes:
+
+![Task 3: classes per client](figures/report/task3-label-skew.png)
+
+| Data split | Final accuracy (3 seeds) | vs IID |
+|---|---|---|
+| IID | 57.0% ± 1.3 | – |
+| α = 1.0 | 56.2% ± 1.2 | −0.7 |
+| α = 0.5 | 55.6% ± 0.2 | −1.4 |
+| α = 0.1 | 49.5% ± 1.5 | −7.5 |
+
+![Task 3: accuracy per round](figures/report/task3-accuracy.png)
+
+The IID row is the baseline settings averaged over 3 seeds. Seed 42 alone gives the 58.46% quoted for Task 1. Esosa's original single-seed runs (Apple M3) are in `results/task3/`, and every multi-seed run is in `results/seeds/`.
 
 ## Deadlines
 
@@ -113,6 +146,8 @@ The app code is in `fedlearn/`, built on the Lab 10 quickstart:
 | `pyproject.toml` | Dependencies and default run settings (`[tool.flwr.app.config]`) |
 | `scripts/run.py` | Runs one experiment and saves its results to `results/` |
 | `scripts/plot_results.py` | Plots results files and prints a summary table |
+| `scripts/plot_partitions.py` | Heatmaps of how many images of each class every client holds |
+| `scripts/build_figures.sh` | Rebuilds every poster and report figure into `figures/poster/` and `figures/report/` |
 
 ### 3. Run an experiment
 
@@ -160,9 +195,13 @@ Round 1 also includes one-off start-up costs (starting the client processes, loa
 
 ```sh
 python scripts/plot_results.py                                       # all of results/, to figures/accuracy.png
-python scripts/plot_results.py results/iid-c*.json -o figures/task2.png --x time
-python scripts/plot_results.py results/dirichlet* --metric loss
+python scripts/plot_results.py results/task2/*.json -o figures/task2.png --x time
+python scripts/plot_results.py results/task3/*.json --metric loss
+python scripts/plot_partitions.py                                    # classes per client, IID vs Dirichlet
+sh scripts/build_figures.sh                                          # every poster + report figure
 ```
+
+`--style poster|report` sizes figures for the A0 poster or one column of the IEEE report (300 dpi PNG). `--seeds` averages runs that differ only in their `-s<seed>` suffix and shades the min–max band. `--ref NAME` draws a run as the grey dashed baseline, and `--label NAME=TEXT` sets display names.
 
 It also prints a table of final and best accuracy, mean seconds per round, and total time for each run. Commit finished results files so everyone plots from the same data.
 

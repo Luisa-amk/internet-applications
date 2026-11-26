@@ -1,6 +1,7 @@
 """The run/plot helper scripts. Nothing is actually trained."""
 
 import importlib.util
+import itertools
 import json
 from pathlib import Path
 
@@ -86,3 +87,58 @@ def test_plot_results_end_to_end(tmp_path, capsys):
     assert out.stat().st_size > 0
     printed = capsys.readouterr().out
     assert "iid-c2-r2-s42" in printed and "40.00%" in printed and "10.0" in printed
+
+
+def test_spread_labels_moves_only_colliding_labels():
+    placed = plot_results.spread_labels([0.585, 0.574, 0.559, 0.479], min_gap=0.03)
+    assert placed[3] == 0.479  # far from the others: stays on its line
+    top_three = sorted(placed[:3])
+    assert all(b - a >= 0.03 - 1e-9 for a, b in itertools.pairwise(top_three))
+    # The group stays centred on the real values
+    assert abs(sum(placed[:3]) / 3 - (0.585 + 0.574 + 0.559) / 3) < 1e-9
+
+
+def test_parse_labels():
+    assert plot_results.parse_labels(["task2-c2=2 clients"]) == {"task2-c2": "2 clients"}
+    with pytest.raises(SystemExit):
+        plot_results.parse_labels(["no-equals-sign"])
+
+
+def _run(name, accs, times):
+    return {
+        "name": name,
+        "num_clients": 2,
+        "rounds": [
+            {"round": i, "accuracy": a, "loss": 1.0, "round_time_s": t}
+            for i, (a, t) in enumerate(zip(accs, times, strict=True))
+        ],
+    }
+
+
+@pytest.mark.parametrize("style", ["poster", "report"])
+def test_styles_write_a_png(tmp_path, style):
+    runs = [_run("base", [0.1, 0.3], [None, 9.0]), _run("a", [0.1, 0.4], [None, 8.0])]
+    out = plot_results.plot(
+        runs, "accuracy", "round", tmp_path / "fig.svg", style=style, refs=["base"]
+    )
+    assert out.suffix == ".png" and out.stat().st_size > 0
+
+
+def test_seeds_are_averaged_with_min_max_band():
+    runs = [
+        _run("c2-s42", [0.1, 0.5], [None, 10.0]),
+        _run("c2-s43", [0.1, 0.7], [None, 20.0]),
+        _run("c5-s42", [0.1, 0.4], [None, 5.0]),
+    ]
+    c2, c5 = plot_results.make_series(runs, "accuracy", "time", seeds=True)
+    assert (c2["name"], c2["n"], c5["name"], c5["n"]) == ("c2", 2, "c5", 1)
+    assert c2["ys"][1] == pytest.approx(0.6)
+    assert (c2["lo"][1], c2["hi"][1]) == (0.5, 0.7)
+    assert c2["xs"] == [0.0, 15.0]  # mean cumulative time
+    assert c5["lo"] is None  # a single seed has no band
+
+
+def test_label_counts():
+    plot_partitions = load_script("plot_partitions")
+    counts = plot_partitions.label_counts([[0, 0, 2], [1]], num_classes=3)
+    assert counts.tolist() == [[2, 0, 1], [0, 1, 0]]
